@@ -18,6 +18,62 @@ const { verifyToken, verifyClient } = require("../tokenManager/tokenVerify.js");
 
 global.giftReceived = {};
 
+setInterval(async () => {
+  try {
+    const users = await Profile.find({});
+    for (const user of users) {
+      const cc = user.profiles.common_core;
+      const p0 = user.profiles.profile0;
+
+      if (!cc || !p0) continue;
+
+      let ccKey, p0Key, ccAmount, p0Amount;
+
+      for (let key in cc.items) {
+        if (cc.items[key].templateId.toLowerCase().startsWith("currency:mtxpurchased")) {
+          ccKey = key; ccAmount = cc.items[key].quantity; break;
+        }
+      }
+
+      for (let key in p0.items) {
+        if (p0.items[key].templateId.toLowerCase().startsWith("currency:mtxpurchased")) {
+          p0Key = key; p0Amount = p0.items[key].quantity; break;
+        }
+      }
+
+      if (ccKey == null || p0Key == null) continue;
+
+		const ccBroken = !Number.isFinite(ccAmount) || ccAmount < 0;
+		const p0Broken = !Number.isFinite(p0Amount) || p0Amount < 0;
+
+      let updates = {};
+
+      if (ccBroken && !p0Broken) {
+        if (!Number.isFinite(p0Amount)) continue;
+        updates[`profiles.common_core.items.${ccKey}.quantity`] = p0Amount;
+        console.log(`[FIX] Fixed common_core for ${user.accountId} -> ${p0Amount}`);
+      } else if (!ccBroken && p0Broken) {
+        if (!Number.isFinite(ccAmount)) continue;
+        updates[`profiles.profile0.items.${p0Key}.quantity`] = ccAmount;
+        console.log(`[FIX] Fixed profile0 for ${user.accountId} -> ${ccAmount}`);
+      } else if (ccBroken && p0Broken) {
+        updates[`profiles.common_core.items.${ccKey}.quantity`] = 0;
+        updates[`profiles.profile0.items.${p0Key}.quantity`] = 0;
+        console.log(`[FIX] Both subprofiles broken for ${user.accountId} -> set to 0`);
+      }
+
+      if (Object.keys(updates).length > 0) {
+        await Profile.updateOne(
+          { accountId: user.accountId },
+          { $set: updates }
+        );
+      }
+    }
+  } catch (err) {
+    console.error("[CURRENCY FIX ERROR]", err);
+  }
+}, 15 * 1000);
+
 app.post("/fortnite/api/game/v2/profile/*/client/SetReceiveGiftsEnabled", verifyToken, async (req, res) => {
     log.debug(`SetReceiveGiftsEnabled: Request received with body: ${JSON.stringify(req.body)}`);
 
@@ -1890,8 +1946,19 @@ app.post("/fortnite/api/game/v2/profile/*/client/PurchaseCatalogEntry", verifyTo
                                 return error.createError("errors.com.epicgames.currency.mtx.insufficient", `You cannot afford this item (${totalPrice}), you only have ${profile.items[key].quantity}.`, [`${totalPrice}`, `${profile.items[key].quantity}`], 1040, undefined, 400, res);
                             }
                 
-                            profile.items[key].quantity -= totalPrice;
-                            profile0.items[key].quantity -= totalPrice;
+							profile.items[key].quantity -= Math.floor(totalPrice / 2);
+							profile0.items[key].quantity -= Math.floor(totalPrice / 2);
+
+							// Check for NaN before applying changes
+							if (isNaN(profile.items[key].quantity) || isNaN(profile0.items[key].quantity)) {
+								log.debug(`PurchaseCatalogEntry: Quantity became NaN! Aborting purchase.`);
+								return error.createError(
+									"errors.com.epicgames.currency.mtx.insufficient",
+									`A server-side corruption has occurred. Please close the game, wait 15 seconds, and open the game again.`,
+									[`${findOfferId.offerId.prices[0].finalPrice}`], 1040, undefined, 400, res
+								);
+							}
+							
                             ApplyProfileChanges.push(
                                 {
                                     "changeType": "itemQuantityChanged",
@@ -2464,9 +2531,20 @@ app.post("/fortnite/api/game/v2/profile/*/client/PurchaseCatalogEntry", verifyTo
                             [`${findOfferId.offerId.prices[0].finalPrice}`, `${profile.items[key].quantity}`], 1040, undefined, 400, res
                         );
                     }
+					
+					shittyPrice = findOfferId.offerId.prices[0].finalPrice;
+                    profile.items[key].quantity -= Math.floor(shittyPrice / 2);
+                    profile0.items[key].quantity -= Math.floor(shittyPrice / 2);
 
-                    profile.items[key].quantity -= findOfferId.offerId.prices[0].finalPrice;
-                    profile0.items[key].quantity -= findOfferId.offerId.prices[0].finalPrice;;
+					// Check for NaN before applying changes
+					if (isNaN(profile.items[key].quantity) || isNaN(profile0.items[key].quantity)) {
+						log.debug(`PurchaseCatalogEntry: Quantity became NaN! Aborting purchase.`);
+						return error.createError(
+							"errors.com.epicgames.currency.mtx.insufficient",
+							`A server-side corruption has occurred. Please close the game, wait 15 seconds, and open the game again.`,
+							[`${findOfferId.offerId.prices[0].finalPrice}`], 1040, undefined, 400, res
+						);
+					}
 
                     ApplyProfileChanges.push(
                         {
