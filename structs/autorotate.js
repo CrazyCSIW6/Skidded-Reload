@@ -133,6 +133,33 @@ function formatitemgrantsyk(item) {
     return [`${itemType}:${id}`];
 }
 
+function pickFeaturedItems(items, count) {
+    const itemTypeBuckets = {
+        athenaCharacter: []
+    };
+
+    items.forEach(item => {
+        const type = item.type?.value.toLowerCase();
+        const rarity = item.rarity?.value.toLowerCase();
+
+        if (type === "outfit" && ["epic", "legendary"].includes(rarity)) {
+            itemTypeBuckets.athenaCharacter.push(item);
+        }
+    });
+
+    const selectedItems = [];
+
+    function addItemsFromBucket(bucket, requiredCount) {
+        const availableItems = bucket.sort(() => 0.5 - Math.random()).slice(0, requiredCount);
+        selectedItems.push(...availableItems);
+    }
+
+    // Only pick outfits
+    addItemsFromBucket(itemTypeBuckets.athenaCharacter, Math.min(count, itemTypeBuckets.athenaCharacter.length));
+
+    return selectedItems.slice(0, count);
+}
+
 function capitalizeomg(string) {
     return string.charAt(0).toUpperCase() + string.slice(1);
 }
@@ -403,8 +430,8 @@ async function discordpost(itemShop) {
     }
 
     embeds.push({
-        title: "Reload Item Shop",
-        description: `These are the cosmetics for today!`,
+        title: "The item shop has rotated!",
+        description: `The new cosmetics are displayed below.`,
         color: 0x00FF7F,
         fields: [],
     });
@@ -425,7 +452,7 @@ async function discordpost(itemShop) {
 
     const nextRotationTimestamp = getNextRotationTime();
     embeds.push({
-        description: `The next shop will be updated at <t:${nextRotationTimestamp}:t>.`,
+        description: `New items will be added to the shop in an hour.`,
         color: 0x00FF7F
     });
 
@@ -451,12 +478,25 @@ async function rotateshop() {
     try {
         const cosmetics = await fetchitems();
         if (cosmetics.length === 0) {
-            log.error('No cosmetics found?'); // target was here!
+            log.error('No cosmetics found?');
             return;
         }
 
-        const dailyItems = pickRandomItems(cosmetics, dailyItemsCount);
-        const featuredItems = pickRandomItems(cosmetics, featuredItemsCount);
+        const usedItemIds = new Set();
+
+        // Pick featured items first (they have stricter requirements)
+        const featuredItems = pickFeaturedItems(
+            cosmetics.filter(item => !usedItemIds.has(item.id)),
+            featuredItemsCount
+        );
+        featuredItems.forEach(item => usedItemIds.add(item.id));
+
+        // Pick daily items, excluding featured
+        const dailyItems = pickRandomItems(
+            cosmetics.filter(item => !usedItemIds.has(item.id)),
+            dailyItemsCount
+        );
+        dailyItems.forEach(item => usedItemIds.add(item.id));
 
         updatecfgomg(dailyItems, featuredItems);
         await discordpost({ daily: dailyItems, featured: featuredItems });
