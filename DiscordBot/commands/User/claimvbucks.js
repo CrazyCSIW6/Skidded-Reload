@@ -6,7 +6,7 @@ const log = require("../../../structs/log.js");
 module.exports = {
     commandInfo: {
         name: "claimvbucks",
-        description: "Claim your hourly 100 V-Bucks"
+        description: "Claim your hourly 250 V-Bucks"
     },
     async execute(interaction) {
         try {
@@ -29,8 +29,8 @@ module.exports = {
             }
 
             const filter = { accountId: user?.accountId };
-            const updateCommonCore = { $inc: { 'profiles.common_core.items.Currency:MtxPurchased.quantity': 100 } }; //100 per hour. this system sucks dick
-            const updateProfile0 = { $inc: { 'profiles.profile0.items.Currency:MtxPurchased.quantity': 100 } }; //my nuts hurt
+            const updateCommonCore = { $inc: { 'profiles.common_core.items.Currency:MtxPurchased.quantity': 250 } }; //250 per hour. this system sucks dick
+            const updateProfile0 = { $inc: { 'profiles.profile0.items.Currency:MtxPurchased.quantity': 250 } }; //my nuts hurt
 
             const userUpdatedProfile = await Profiles.findOneAndUpdate(
                 filter,
@@ -60,8 +60,8 @@ module.exports = {
             });
 
             const embed = new MessageEmbed()
-                .setTitle("hourly V-Bucks Claimed!")
-                .setDescription(`You have claimed your hourly **100 V-Bucks**!`)
+                .setTitle("Hourly V-Bucks Claimed!")
+                .setDescription(`You have claimed your hourly **250 V-Bucks**!`)
                 .setThumbnail("https://i.imgur.com/yLbihQa.png")
                 .setColor("#1eff00")
                 .setFooter({
