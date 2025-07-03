@@ -479,12 +479,10 @@ function getUTCTimeFromLocal(hour, minute) {
 
 function milisecstillnextrotation() {
     const now = new Date();
-    const [localHour, localMinute] = config.bRotateTime.toString().split(':').map(Number);
-    const nextRotation = getUTCTimeFromLocal(localHour, localMinute);
-
-    if (now.getTime() >= nextRotation.getTime()) {
-        nextRotation.setUTCDate(nextRotation.getUTCDate() + 1);
-    }
+    const nextRotation = new Date(now);
+    nextRotation.setSeconds(0);
+    nextRotation.setMilliseconds(0);
+    nextRotation.setMinutes(nextRotation.getMinutes() + 60);
 
     const millisUntilNextRotation = nextRotation.getTime() - now.getTime();
     log.AutoRotation(`Current time: ${now.toUTCString()}`);
@@ -493,5 +491,6 @@ function milisecstillnextrotation() {
 
     return millisUntilNextRotation;
 }
+
 
 setTimeout(rotateshop, milisecstillnextrotation());

@@ -70,11 +70,16 @@ function GetVersionInfo(req) {
                 memory.build = 1.0;
                 memory.CL = CL;
                 memory.lobby = "LobbySeason1";
-            } else {
+            } else if (Number(memory.cl) <= 3825894) {
                 memory.season = 2;
                 memory.build = 2.0;
                 memory.CL = CL;
                 memory.lobby = "LobbyWinterDecor";
+            } else {
+                memory.season = 2;
+                memory.build = 2.0;
+                memory.CL = CL;
+                memory.lobby = "LobbySeason2";
             }
         }
     }
@@ -198,7 +203,7 @@ function getItemShop() {
     const CatalogConfig = JSON.parse(fs.readFileSync(path.join(__dirname, "..", "Config", "catalog_config.json").toString()));
     
     const todayAtMidnight = new Date();
-    todayAtMidnight.setHours(24, 0, 0, 0)
+    todayAtMidnight.setHours(1, 0, 0, 0)
     const todayOneMinuteBeforeMidnight = new Date(todayAtMidnight.getTime() - 60000);
     const isoDate = todayOneMinuteBeforeMidnight.toISOString();
 
